@@ -1,0 +1,12 @@
+---
+title: "Testo-miR191"
+author: "Gabriel"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+#Pacotes
+```{r setup, include=FALSE}
+library(tidyverse)
+library(reshape2)
+```
