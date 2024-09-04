@@ -117,7 +117,7 @@ fData(eset_final)$PROBEID <- rownames(fData(eset_final))
 fData(eset_final) <- left_join(fData(eset_final), anno_eset)
 rownames(fData(eset_final)) <- fData(eset_final)$PROBEID
 ```
-<<<<<<< HEAD
+
 
 ```{r}
 exp_final <- exprs(eset_final)
@@ -126,25 +126,41 @@ fData(eset_final) %>% View()
 fData(eset_final) %>% is.na() %>% sum()
 ```
 
+#Cluster
+```{r}
+dist <- dist(t(exp_final))
+hc <- hclust(dist)
+dend <- as.dendrogram(hc)
+
+
+dend %>% 
+  color_labels(labels = colnames(exp_final[,1:4]), col="darkred") %>%
+  color_labels(labels = colnames(exp_final[,5:9]), col="darkgreen") %>%
+  plot()
+
+  legend("topright",
+       legend=c("Perivascular (Hip)", "Perivascular (WM)",  "Mesenchymal"),
+       col=c("darkred", "red", "blue"),
+       pch=c(20,20,20), bty = "n", pt.cex = 1.8, cex = .8, trace=T)
+```
+
 #DEG
 ```{r}
 design <- model.matrix(~ 0 + pdata$`treatment:ch1`)
-colnames(design) <- levels(as.factor(pd$`cell type:ch1`))
-contrast_matrix <- makeContrasts(Perivascular - Mesenchymal, levels=design) #Mesenchymal como referencia
+colnames(design) <- levels(as.factor(pdata$`treatment:ch1`))
+contrast_matrix <- makeContrasts(Goserelin - Placebo, levels=design) #Mesenchymal como referencia
 contrast_matrix
 
-fit <- lmFit(gse62_final, design)
+fit <- lmFit(exp_final, design)
 fit2 <- contrasts.fit(fit, contrasts = contrast_matrix)
 fit2 <- eBayes(fit2)
 fitted.ebayes <- eBayes(fit)
 topTable(fit2)
 
-summary(decideTests(fit2,lfc=2, adjust.method = "fdr", p.value = 0.05))
+summary(decideTests(fit2,lfc=1, adjust.method = "fdr", p.value = 0.05))
 #Adicionar entrezid
 
-res_gse62 <- topTable(fit2, number = Inf)
-res_gse62_lfc <- topTable(fit2, number = Inf, p.value = 0.05, lfc=2)
+topTable(fit2, number = Inf)
 ```
 
-=======
->>>>>>> 74331d883179504aeff4456890a2608a6faf4d6b
+*Apenas 1 probe deu valor de p adj = 0.051. A referencia original menciona que mesmo removendo uma amostra possivelmente outlier, apenas 1 probeID atingiu significancia estatistica, e portanto alteraram o metodo de analise para p valor normal e etc. PMID: 25294097
