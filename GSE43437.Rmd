@@ -5,8 +5,104 @@ date: "`r Sys.Date()`"
 output: html_document
 ---
 
+Analise do GSE43437 GPL570 [HG-U133_Plus_2] Affymetrix Human Genome U133 Plus 2.0 Array
+
+
 #Pacotes
 ```{r setup, include=FALSE}
+library(GEOquery)
 library(tidyverse)
+library(limma)
+library(oligo)
+library(AnnotationDbi)
+      library(hgu133plus2.db)
 library(reshape2)
+
+#Graficos
+library(dendextend)
+library(pheatmap)
+library(factoextra); library(FactoMineR)
+library(EnhancedVolcano)
+library(ggpubr)
+
+```
+
+
+```{r}
+#Adquirir pData
+my_id <- "GSE43437"
+geo <- getGEO(my_id)
+gse <- geo[[1]]
+pdata <- pData(gse)
+
+sample_info <- pdata %>% dplyr::select(title, platform_id)
+```
+
+```{r}
+#Leitura de dados brutos em arquivo .CEL
+celdata <- read.celfiles(list.celfiles(listGzipped = T))
+celdata@featureData@data
+fData(celdata)
+```
+
+##Normalizacao
+```{r}
+#Normalização da expressão utilizando RMA
+oligo::hist(exprs(celdata))
+
+eset_norm <- rma(celdata)
+oligo::hist(eset_norm)
+
+head(exprs(eset_norm))
+
+eset_medians <- rowMedians(Biobase::exprs(eset_norm))
+
+#Filtro para baixas leituras
+hist_res <- hist(eset_medians, 100, col = "cornsilk1", freq = FALSE, 
+            main = "Histogram of the median intensities", 
+            border = "antiquewhite4",
+            xlab = "Median intensities")
+
+abline(v = 4.1, col = "coral4", lwd = 2)
+
+
+idx_man_threshold <- apply(Biobase::exprs(eset_norm), 1,
+                           function(x){
+                          sum(x > 4.1) >= 3})
+                          table(idx_man_threshold)
+
+table(idx_man_threshold)
+
+eset_filtered <- subset(eset_norm, idx_man_threshold)
+
+```
+
+##Anotacao
+```{r}
+#Anotação de probeID com nome do gene
+anno_eset <- AnnotationDbi::select(hgu133plus2.db,
+                                  keys = (featureNames(eset_filtered)),
+                                  columns = c("SYMBOL", "GENENAME"),
+                                  keytype = "PROBEID")
+
+anno_eset <- subset(anno_eset, !is.na(SYMBOL))
+
+
+anno_grouped <- group_by(anno_eset, PROBEID)
+anno_summarized <- dplyr::summarize(anno_grouped, no_of_matches = n_distinct(SYMBOL))
+head(anno_summarized)
+
+#Remover genes duplicados
+anno_filtered <- filter(anno_summarized, no_of_matches > 1)
+probe_stats <- anno_filtered
+
+ids_to_exlude <- (featureNames(eset_filtered) %in% probe_stats$PROBEID)
+table(ids_to_exlude)
+
+eset_final <- subset(eset_filtered, !ids_to_exlude)
+
+fData(eset_final)$PROBEID <- rownames(fData(eset_final))
+
+fData(eset_final) <- left_join(fData(eset_final), anno_eset)
+rownames(fData(eset_final)) <- fData(eset_final)$PROBEID
 ```
