@@ -16,6 +16,7 @@ library(limma)
 library(oligo)
 library(AnnotationDbi)
       library(hgu133plus2.db)
+      library(pd.hg.u133.plus.2)
 library(reshape2)
 
 #Graficos
@@ -56,7 +57,8 @@ celdata@featureData@data
 fData(celdata)
 ```
 
-##Normalizacao
+
+#Normalizacao
 ```{r}
 #Normalização da expressão utilizando RMA
 oligo::hist(exprs(celdata))
@@ -86,6 +88,104 @@ table(idx_man_threshold)
 
 eset_filtered <- subset(eset_norm, idx_man_threshold)
 
+```
+
+#Cluster
+```{r}
+dist <- dist(t(exprs(eset_filtered)))
+hc <- hclust(dist)
+dend <- as.dendrogram(hc)
+
+
+dend %>% 
+  color_labels(labels = colnames(exp_final[,1:4]), col="darkgreen") %>%
+  color_labels(labels = colnames(exp_final[,5:9]), col="blue") %>%
+  plot()
+
+  legend("topright",
+       legend=c("Placebo", 'Goserelin (Testosterona)'),
+       col=c('darkgreen', 'blue'),
+      
+        pch=c(20,20,20), bty = "n", pt.cex = 1.8, cex = .8, trace=F)
+
+  
+  
+```
+
+
+#Subset
+```{r}
+colnames(eset_filtered)
+
+#Descobrir indice das amostras a retirar
+which(pdata$cel_file %in% c("GSM1062408_Subject_OE3.CEL.gz","GSM1062405_Subject_R3.CEL.gz" ))
+
+pdata.select <- pdata[-c(4,7),]
+celdata.select <- celdata[,pdata.select$cel_file]
+
+dim(pdata.select)
+dim(celdata.select)
+
+```
+
+##Normalizacao2
+```{r}
+#Normalização da expressão utilizando RMA
+oligo::hist(exprs(celdata))
+
+eset.select <- rma(celdata.select)
+oligo::hist(eset.select)
+
+head(exprs(eset.select))
+
+eset_medians <- rowMedians(Biobase::exprs(eset.select))
+
+#Filtro para baixas leituras
+hist_res <- hist(eset_medians, 100, col = "cornsilk1", freq = FALSE, 
+            main = "Histogram of the median intensities", 
+            border = "antiquewhite4",
+            xlab = "Median intensities")
+
+abline(v = 4.1, col = "coral4", lwd = 2)
+
+
+idx_man_threshold <- apply(Biobase::exprs(eset.select), 1,
+                           function(x){
+                          sum(x > 4.1) >= 3})
+                          table(idx_man_threshold)
+
+table(idx_man_threshold)
+
+eset_filtered <- subset(eset.select, idx_man_threshold)
+
+exp_final <- exprs(eset.select)
+dim(exp_final)
+dim(exp_final)
+fData(eset_final) %>% View()
+fData(eset_final) %>% is.na() %>% sum()
+
+```
+
+#Cluster
+```{r}
+dist <- dist(t(exprs(eset_filtered)))
+hc <- hclust(dist)
+dend <- as.dendrogram(hc)
+
+
+dend %>% 
+  color_labels(labels = colnames(exp_final[,1:3]), col="darkgreen") %>%
+  color_labels(labels = colnames(exp_final[,4:7]), col="blue") %>%
+  plot()
+
+  legend("topright",
+       legend=c("Placebo", 'Goserelin (Testosterona)'),
+       col=c('darkgreen', 'blue'),
+      
+        pch=c(20,20,20), bty = "n", pt.cex = 1.8, cex = .8, trace=F)
+
+  
+  
 ```
 
 ##Anotacao
@@ -120,34 +220,17 @@ rownames(fData(eset_final)) <- fData(eset_final)$PROBEID
 
 
 ```{r}
-exp_final <- exprs(eset_final)
+#exp_final <- exprs(eset_final)
 dim(exp_final)
 fData(eset_final) %>% View()
 fData(eset_final) %>% is.na() %>% sum()
 ```
 
-#Cluster
-```{r}
-dist <- dist(t(exp_final))
-hc <- hclust(dist)
-dend <- as.dendrogram(hc)
-
-
-dend %>% 
-  color_labels(labels = colnames(exp_final[,1:4]), col="darkred") %>%
-  color_labels(labels = colnames(exp_final[,5:9]), col="darkgreen") %>%
-  plot()
-
-  legend("topright",
-       legend=c("Perivascular (Hip)", "Perivascular (WM)",  "Mesenchymal"),
-       col=c("darkred", "red", "blue"),
-       pch=c(20,20,20), bty = "n", pt.cex = 1.8, cex = .8, trace=T)
-```
 
 #DEG
 ```{r}
-design <- model.matrix(~ 0 + pdata$`treatment:ch1`)
-colnames(design) <- levels(as.factor(pdata$`treatment:ch1`))
+design <- model.matrix(~ 0 + pdata.select$`treatment:ch1`)
+colnames(design) <- levels(as.factor(pdata.select$`treatment:ch1`))
 contrast_matrix <- makeContrasts(Goserelin - Placebo, levels=design) #Mesenchymal como referencia
 contrast_matrix
 
@@ -160,7 +243,9 @@ topTable(fit2)
 summary(decideTests(fit2,lfc=1, adjust.method = "fdr", p.value = 0.05))
 #Adicionar entrezid
 
-topTable(fit2, number = Inf)
+topTable(fit2, number = 20)
 ```
 
 *Apenas 1 probe deu valor de p adj = 0.051. A referencia original menciona que mesmo removendo uma amostra possivelmente outlier, apenas 1 probeID atingiu significancia estatistica, e portanto alteraram o metodo de analise para p valor normal e etc. PMID: 25294097
+
+  **Filtro removendo duas amostras "deslocadas" nao alterou nada
