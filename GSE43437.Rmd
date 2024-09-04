@@ -35,12 +35,18 @@ geo <- getGEO(my_id)
 gse <- geo[[1]]
 pdata <- pData(gse)
 
-sample_info <- pdata %>% dplyr::select(title, platform_id)
+pdata$cel_file <- str_split(pdata$supplementary_file,"/") %>% map_chr(tail,1) #Criar nova coluna (cel_file) contendo o nome do arquivo de cada leitura. Importante para manter a ordem das leituras ao importar os dados de leitura
+
+#Importar com a ordem correta, garantindo que as leituras estao mapeadas para as amostras certas
+
+sample_info <- pdata %>% dplyr::select(title, platform_id, `treatment:ch1`)
 ```
 
 ```{r}
 #Leitura de dados brutos em arquivo .CEL
-celdata <- read.celfiles(list.celfiles(listGzipped = T))
+## Leitura na ordem correta que aparece no pData
+celdata <-  read.celfiles(pdata$cel_file, list.celfiles(listGzipped = F))
+
 celdata@featureData@data
 fData(celdata)
 ```
@@ -106,3 +112,31 @@ fData(eset_final)$PROBEID <- rownames(fData(eset_final))
 fData(eset_final) <- left_join(fData(eset_final), anno_eset)
 rownames(fData(eset_final)) <- fData(eset_final)$PROBEID
 ```
+
+```{r}
+exp_final <- exprs(eset_final)
+dim(exp_final)
+fData(eset_final) %>% View()
+fData(eset_final) %>% is.na() %>% sum()
+```
+
+#DEG
+```{r}
+design <- model.matrix(~ 0 + pdata$`treatment:ch1`)
+colnames(design) <- levels(as.factor(pd$`cell type:ch1`))
+contrast_matrix <- makeContrasts(Perivascular - Mesenchymal, levels=design) #Mesenchymal como referencia
+contrast_matrix
+
+fit <- lmFit(gse62_final, design)
+fit2 <- contrasts.fit(fit, contrasts = contrast_matrix)
+fit2 <- eBayes(fit2)
+fitted.ebayes <- eBayes(fit)
+topTable(fit2)
+
+summary(decideTests(fit2,lfc=2, adjust.method = "fdr", p.value = 0.05))
+#Adicionar entrezid
+
+res_gse62 <- topTable(fit2, number = Inf)
+res_gse62_lfc <- topTable(fit2, number = Inf, p.value = 0.05, lfc=2)
+```
+
