@@ -35,6 +35,7 @@ geo <- getGEO(my_id)
 gse <- geo[[1]]
 pdata <- pData(gse)
 
+
 pdata$cel_file <- str_split(pdata$supplementary_file,"/") %>% map_chr(tail,1) #Criar nova coluna (cel_file) contendo o nome do arquivo de cada leitura. Importante para manter a ordem das leituras ao importar os dados de leitura
 
 #Importar com a ordem correta, garantindo que as leituras estao mapeadas para as amostras certas
@@ -44,8 +45,12 @@ sample_info <- pdata %>% dplyr::select(title, platform_id, `treatment:ch1`)
 
 ```{r}
 #Leitura de dados brutos em arquivo .CEL
+
 ## Leitura na ordem correta que aparece no pData
 celdata <-  read.celfiles(pdata$cel_file, list.celfiles(listGzipped = F))
+
+
+celdata <- read.celfiles(list.celfiles(listGzipped = T))
 
 celdata@featureData@data
 fData(celdata)
@@ -112,6 +117,7 @@ fData(eset_final)$PROBEID <- rownames(fData(eset_final))
 fData(eset_final) <- left_join(fData(eset_final), anno_eset)
 rownames(fData(eset_final)) <- fData(eset_final)$PROBEID
 ```
+<<<<<<< HEAD
 
 ```{r}
 exp_final <- exprs(eset_final)
@@ -140,3 +146,5 @@ res_gse62 <- topTable(fit2, number = Inf)
 res_gse62_lfc <- topTable(fit2, number = Inf, p.value = 0.05, lfc=2)
 ```
 
+=======
+>>>>>>> 74331d883179504aeff4456890a2608a6faf4d6b
